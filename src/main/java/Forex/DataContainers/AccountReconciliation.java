@@ -1,4 +1,4 @@
-package Forex.CalculationLogic;
+package Forex.DataContainers;
 
 import java.math.BigDecimal;
 
@@ -47,5 +47,53 @@ public class AccountReconciliation {
                 ", debitTurnoverDifference=" + debitTurnoverDifference +
                 ", creditTurnoverDifference=" + creditTurnoverDifference +
                 '}';
+    }
+
+    public String getAccountId() {
+        return accountId;
+    }
+
+    public String getAccountDescription() {
+        return accountDescription;
+    }
+
+    public String getAccountCurrency() {
+        return accountCurrency;
+    }
+
+    public String getCurrencyCode() {
+        return currencyCode;
+    }
+
+    public BigDecimal getOpeningBalancePerTb() {
+        return openingBalancePerTb;
+    }
+
+    public BigDecimal getDebitTurnoverPerTb() {
+        return debitTurnoverPerTb;
+    }
+
+    public BigDecimal getCreditTurnoverPerTb() {
+        return creditTurnoverPerTb;
+    }
+
+    public BigDecimal getClosingBalancePerTb() {
+        return closingBalancePerTb;
+    }
+
+    public BigDecimal getDebitTurnoverPerJe() {
+        return debitTurnoverPerJe;
+    }
+
+    public BigDecimal getCreditTurnoverPerJe() {
+        return creditTurnoverPerJe;
+    }
+
+    public BigDecimal getDebitTurnoverDifference() {
+        return debitTurnoverDifference;
+    }
+
+    public BigDecimal getCreditTurnoverDifference() {
+        return creditTurnoverDifference;
     }
 }

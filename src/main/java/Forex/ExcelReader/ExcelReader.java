@@ -2,6 +2,7 @@ package Forex.ExcelReader;
 
 import Forex.DataContainers.JEHeader;
 import Forex.DataContainers.JERecord;
+import Forex.DataContainers.NBURate;
 import Forex.DataContainers.TBAccount;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -11,6 +12,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
@@ -63,7 +65,8 @@ public class ExcelReader {
         String currency = row.getCell(1).getStringCellValue();
         String entryType = row.getCell(2).getStringCellValue();
         BigDecimal amount = BigDecimal.valueOf(row.getCell(3).getNumericCellValue());
-        return new JERecord(recordDate, currency, entryType, amount);
+        String accountId = new DataFormatter().formatCellValue(row.getCell(4));
+        return new JERecord(recordDate, currency, entryType, amount, accountId);
     }
 
     public JEHeader readJeHeader(Row headerRow) {
@@ -103,15 +106,55 @@ public class ExcelReader {
         return accountBalances;
     }
 
+    public ArrayList<NBURate> readNbuRates() throws IOException {
+
+        FileInputStream inputStream = new FileInputStream(INPUT_PATH);
+
+        XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+        XSSFSheet nbuSheet = workbook.getSheet("NBU");
+
+        ArrayList<NBURate> nbuRates = new ArrayList<>();
+
+        Iterator<Row> rowIterator = nbuSheet.iterator();
+        Row headerRow = rowIterator.next();
+
+        while (rowIterator.hasNext()){
+
+            Row row = rowIterator.next();
+
+            nbuRates.add(readNbuRate(row));
+
+        }
+
+        System.out.println("RESULT");
+        System.out.println("_______________________________________");
+
+        for (NBURate it: nbuRates) {
+            System.out.println(it);
+        }
+        return nbuRates;
+    }
+
+    private NBURate readNbuRate(Row row) {
+        Date date = row.getCell(0).getDateCellValue();
+        String time = new DataFormatter().formatCellValue(row.getCell(1));
+        String currencyCode = new DataFormatter().formatCellValue(row.getCell(2));
+        String currency = new DataFormatter().formatCellValue(row.getCell(3));
+        String currencyAmount = new DataFormatter().formatCellValue(row.getCell(4));
+        String currencyUkr = new DataFormatter().formatCellValue(row.getCell(5));
+        BigDecimal currencyRate = BigDecimal.valueOf(row.getCell(6).getNumericCellValue());
+        return new NBURate(date, time, currencyCode, currency, currencyAmount, currencyUkr, currencyRate);
+    }
+
     private TBAccount readAccountLine(Row row) {
         String accountId = new DataFormatter().formatCellValue(row.getCell(0));
         String accountDescription = new DataFormatter().formatCellValue(row.getCell(1));
         String currency = new DataFormatter().formatCellValue(row.getCell(2));
         String currencyCode = new DataFormatter().formatCellValue(row.getCell(3));
-        String openingBalance = new DataFormatter().formatCellValue(row.getCell(4));
-        String debitTurnover = new DataFormatter().formatCellValue(row.getCell(5));
-        String creditTurnover = new DataFormatter().formatCellValue(row.getCell(6));
-        String closingBalance = new DataFormatter().formatCellValue(row.getCell(7));
+        BigDecimal openingBalance = BigDecimal.valueOf(row.getCell(4).getNumericCellValue());
+        BigDecimal debitTurnover = BigDecimal.valueOf(row.getCell(5).getNumericCellValue());
+        BigDecimal creditTurnover = BigDecimal.valueOf(row.getCell(6).getNumericCellValue());
+        BigDecimal closingBalance = BigDecimal.valueOf(row.getCell(7).getNumericCellValue());
         return new TBAccount(accountId, accountDescription, currency, currencyCode,
                 openingBalance, debitTurnover, creditTurnover, closingBalance);
 
