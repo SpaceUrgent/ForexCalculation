@@ -1,6 +1,7 @@
 package ForexRecalculationTest;
 
 import Forex.CalculationLogic.ForexRecalculation;
+import Forex.Consants.EntryType;
 import Forex.DataContainers.ForexDailyRecalculation;
 import Forex.DataContainers.JERecord;
 import Forex.DataContainers.NBURate;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ForexRecalculationTest {
@@ -56,7 +58,7 @@ class ForexRecalculationTest {
         journalEntries.add(jeRecord3);
         journalEntries.add(jeRecord4);
 
-       fxc = new ForexRecalculation(nbuRates, tbAccounts, journalEntries);
+       fxc = new ForexRecalculation(nbuRates, tbAccounts, journalEntries, 2021);
 
     }
 
@@ -69,7 +71,7 @@ class ForexRecalculationTest {
     }
 
     @Test
-    public void firstLineIsEmpty_testCalculateOpeningBalance(){
+    public void firstLineIsEmpty_testCalculateOpeningBalance() {
 
         ForexDailyRecalculation emptyLine = new ForexDailyRecalculation();
 
@@ -93,13 +95,13 @@ class ForexRecalculationTest {
 
     @Test
     public void calculateDebitTurnoverTest(){
-        BigDecimal result = fxc.calculateDebitTurnover("USD", new Date(2021, 1, 15));
+        BigDecimal result = fxc.calculateTurnoverByType("USD", new Date(2021, 1, 15), EntryType.DR);
         Assertions.assertEquals(result, BigDecimal.valueOf(2500.00));
     }
 
     @Test
     public void calculateCreditTurnoverTest(){
-        BigDecimal result = fxc.calculateCreditTurnover("USD", new Date(2021, 1, 16));
+        BigDecimal result = fxc.calculateTurnoverByType("USD", new Date(2021, 1, 16), EntryType.CR);
         Assertions.assertEquals(result, BigDecimal.valueOf(-4000.00));
     }
 
@@ -128,5 +130,18 @@ class ForexRecalculationTest {
         Assertions.assertEquals(BigDecimal.valueOf(-2000.0), result);
     }
 
+    @Test
+    public void extractOpeningBalanceFromTbIfAbsentThrowsException(){
+        boolean thrown = false;
+        try {
+            BigDecimal result = fxc.extractOpeningBalanceFromTrialBalance("UAH");
+        } catch (NoSuchElementException e) {
+            thrown  = true;
+        }
+
+        Assertions.assertTrue(thrown);
+
+
+    }
 
 }

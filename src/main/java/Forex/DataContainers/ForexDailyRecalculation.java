@@ -32,6 +32,79 @@ public class ForexDailyRecalculation {
         this.profitLossInUah = profitLossInUah;
     }
 
+    public ForexDailyRecalculation(ForexDailyRecalculationBuilder builder) {
+        this.currency = builder.currency;
+        this.date = builder.date;
+        this.currencyRate = builder.currencyRate;
+        this.openingBalance = builder.openingBalance;
+        this.dailyDebitTurnover = builder.dailyDebitTurnover;
+        this.dailyCreditTurnover = builder.dailyCreditTurnover;
+        this.closingBalance = builder.closingBalance;
+        this.profitLossInUah = builder.profitLossInUah;
+    }
+
+    public static class ForexDailyRecalculationBuilder{
+
+        private String currency;
+        private Date date;
+        private BigDecimal currencyRate;
+        private BigDecimal openingBalance;
+        private BigDecimal dailyDebitTurnover;
+        private BigDecimal dailyCreditTurnover;
+        private BigDecimal closingBalance;
+        private BigDecimal profitLossInUah;
+
+        public ForexDailyRecalculationBuilder(){
+        }
+
+        public ForexDailyRecalculationBuilder currency(String currency){
+            this.currency = currency;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder date(Date date){
+            this.date = date;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder currencyRate(BigDecimal currencyRate){
+            this.currencyRate = currencyRate;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder openingBalance(BigDecimal openingBalance){
+            this.openingBalance = openingBalance;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder dailyDebitTurnover(BigDecimal dailyDebitTurnover){
+            this.dailyDebitTurnover = dailyDebitTurnover;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder dailyCreditTurnover(BigDecimal dailyCreditTurnover){
+            this.dailyCreditTurnover = dailyCreditTurnover;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder closingBalance(BigDecimal closingBalance){
+            this.closingBalance = closingBalance;
+            return this;
+        }
+
+        public ForexDailyRecalculationBuilder profitLossInUah(BigDecimal profitLossInUah){
+            this.profitLossInUah = profitLossInUah;
+            return this;
+        }
+
+        public ForexDailyRecalculation build(){
+            ForexDailyRecalculation forexDailyRecalculation = new ForexDailyRecalculation(this);
+            return forexDailyRecalculation;
+        }
+
+
+    }
+
     @Override
     public String toString() {
         return "ForexDailyRecalculation{" +

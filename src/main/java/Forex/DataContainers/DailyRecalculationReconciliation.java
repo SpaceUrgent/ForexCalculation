@@ -19,6 +19,64 @@ public class DailyRecalculationReconciliation {
         this.closingBalance = closingBalance;
     }
 
+    public DailyRecalculationReconciliation(DailyRecalculationReconciliationBuilder builder) {
+        this.currency = builder.currency;
+        this.description = builder.description;
+        this.openingBalance = builder.openingBalance;
+        this.debitTurnover = builder.debitTurnover;
+        this.creditTurnover = builder.creditTurnover;
+        this.closingBalance = builder.closingBalance;
+    }
+
+
+    public static class DailyRecalculationReconciliationBuilder{
+
+        private String currency;
+        private String description;
+        private BigDecimal openingBalance;
+        private BigDecimal debitTurnover;
+        private BigDecimal creditTurnover;
+        private BigDecimal closingBalance;
+
+        public DailyRecalculationReconciliationBuilder(){
+        }
+
+        public DailyRecalculationReconciliationBuilder currency(String currency){
+            this.currency = currency;
+            return this;
+        }
+
+        public DailyRecalculationReconciliationBuilder description(String description){
+            this.description = description;
+            return this;
+        }
+
+        public DailyRecalculationReconciliationBuilder openingBalance(BigDecimal openingBalance){
+            this.openingBalance = openingBalance;
+            return this;
+        }
+
+        public DailyRecalculationReconciliationBuilder debitTurnover(BigDecimal debitTurnover){
+            this.debitTurnover = debitTurnover;
+            return this;
+        }
+
+        public DailyRecalculationReconciliationBuilder creditTurnover(BigDecimal creditTurnover){
+            this.creditTurnover = creditTurnover;
+            return this;
+        }
+
+        public DailyRecalculationReconciliationBuilder closingBalance(BigDecimal closingBalance){
+            this.closingBalance = closingBalance;
+            return this;
+        }
+
+        public DailyRecalculationReconciliation build(){
+            DailyRecalculationReconciliation dailyRecalculationReconciliation = new DailyRecalculationReconciliation(this);
+            return dailyRecalculationReconciliation;
+        }
+    }
+
     public String getCurrency() {
         return currency;
     }

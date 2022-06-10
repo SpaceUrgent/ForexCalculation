@@ -1,18 +1,18 @@
 package Forex.ExcelCreator;
 
-import Forex.DataContainers.AccountReconciliation;
-import org.apache.poi.hssf.util.HSSFColor;
+import Forex.DataContainers.*;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.streaming.SXSSFRow;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
-import org.apache.xmlbeans.impl.common.SAXHelper;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static Forex.Consants.Constants.*;
+
 
 
 public class ExcelCreator {
@@ -22,56 +22,43 @@ public class ExcelCreator {
 
     Sheet forexSheet;
 
-    public void createForexFile() throws FileNotFoundException {
+
+    public void createForexFile(List<AccountReconciliation> accountsReconciliations, List<TotalProfitLossForCurrency> profitAndLossTotals, List<ForexDailyRecalculation> forexDailyRecalculations, List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance) throws IOException {
         forexFile = new XSSFWorkbook();
         forexSheet = forexFile.createSheet("FOREX");
 
+        createRowsBeforeReconciliationTable();
+        int currentRowIndex = fillReconciliationTable(accountsReconciliations);
+        currentRowIndex = createDelimiterRows(currentRowIndex);
+        currentRowIndex++;
+
+        currentRowIndex = createTotalProfitAndLossRow(currentRowIndex, profitAndLossTotals);
+        createForexTables(currentRowIndex, profitAndLossTotals, forexDailyRecalculations, dailyRecalculationReconciliationsToTrialBalance);
+
+        try (OutputStream outputStream = new FileOutputStream(PATH_OUT)){
+            forexFile.write(outputStream);
+        } catch (Exception e) {
+            throw new FileNotFoundException();
+        }
+    }
+
+    public void createRowsBeforeReconciliationTable(){
         Row firstRow = forexSheet.createRow(0);
-        //Create first Cell
+
         Cell firstTableNumber = firstRow.createCell(0);
 
         firstTableNumber.setCellValue("Table 1");
-
-        CellStyle tableNumberStyle = forexFile.createCellStyle();
-        Font tableNumberFont = forexFile.createFont();
-        tableNumberFont.setFontName("Arial");
-        tableNumberFont.setFontHeightInPoints((short) 8);
-        tableNumberFont.setBold(true);
-        tableNumberFont.setColor(IndexedColors.DARK_BLUE.getIndex());
-//        tableNumberFont.setColor(new XSSFColor(new java.awt.Color(48, 84, 150), new DefaultIndexedColorMap()).getIndex());
-        tableNumberStyle.setFont(tableNumberFont);
-        tableNumberStyle.setAlignment(HorizontalAlignment.RIGHT);
-        tableNumberStyle.setFillPattern(FillPatternType.NO_FILL);
-//        tableNumberStyle.setFillForegroundColor(new XSSFColor(new java.awt.Color(48, 84, 150), new DefaultIndexedColorMap()).getIndex());
-//        tableNumberStyle.setFillForegroundColor(IndexedColors.BLUE1.getIndex());
-        firstTableNumber.setCellStyle(tableNumberStyle);
+        firstTableNumber.setCellStyle(StyleHelper.createTableNumberStyle(forexFile));
 
         Cell tableName = firstRow.createCell(1);
         tableName.setCellValue("Reconciliation TB to JE");
 
-        CellStyle tableNameStyle = forexFile.createCellStyle();
-        Font tableNameFont = forexFile.createFont();
-        tableNameFont.setFontName("Arial");
-        tableNameFont.setFontHeightInPoints((short) 8);
-        tableNameFont.setBold(true);
-        tableNameStyle.setFont(tableNameFont);
-        tableNameStyle.setAlignment(HorizontalAlignment.LEFT);
-        tableName.setCellStyle(tableNameStyle);
-
         Row secondRow = forexSheet.createRow(1);
 
-        CellStyle secondRowStyle = forexFile.createCellStyle();
-        Font secondRowFont = forexFile.createFont();
-        secondRowFont.setFontName("Arial");
-        secondRowFont.setFontHeightInPoints((short) 8);
-        secondRowFont.setItalic(true);
-        secondRowStyle.setFont(secondRowFont);
-        secondRowStyle.setBorderBottom(BorderStyle.MEDIUM);
-
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < RECONCILIATION_TABLE_LENGTH; i++) {
 
             Cell currentCell = secondRow.createCell(i);
-            currentCell.setCellStyle(secondRowStyle);
+            currentCell.setCellStyle(StyleHelper.createTableHeaderAnnotationStyle(forexFile));
             if (i == 4)
                 currentCell.setCellValue("Per TB>>");
             if (i == 8)
@@ -79,61 +66,25 @@ public class ExcelCreator {
 
         }
 
-        CellStyle columnHeaderStyle = forexFile.createCellStyle();
-        Font columnHeaderFont = forexFile.createFont();
-
-        columnHeaderFont.setFontName("Arial");
-        columnHeaderFont.setFontHeightInPoints((short) 8);
-        columnHeaderFont.setBold(true);
-        columnHeaderStyle.setFont(columnHeaderFont);
-        columnHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        columnHeaderStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-
-        columnHeaderStyle.setAlignment(HorizontalAlignment.CENTER);
-        columnHeaderStyle.setBorderBottom(BorderStyle.MEDIUM);
-
-        CellStyle columnHeaderStyleDiff = forexFile.createCellStyle();
-        Font columnHeaderFontDiff = forexFile.createFont();
-
-        columnHeaderFontDiff.setFontName("Arial");
-        columnHeaderFontDiff.setFontHeightInPoints((short) 8);
-        columnHeaderFontDiff.setBold(true);
-        columnHeaderFontDiff.setColor(IndexedColors.RED.getIndex());
-        columnHeaderStyleDiff.setFont(columnHeaderFontDiff);
-        columnHeaderStyleDiff.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        columnHeaderStyleDiff.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-//        columnHeaderStyleDiff.setFillBackgroundColor(IndexedColors.RED.getIndex());
-        columnHeaderStyleDiff.setAlignment(HorizontalAlignment.CENTER);
-        columnHeaderStyleDiff.setBorderBottom(BorderStyle.MEDIUM);
-
         Row thirdRow = forexSheet.createRow(2);
 
-        String[] columnNames = {"Acc", "Descr", "Currency", "Curr/ Code", "OB", "DR TO", "CR TO", "CB", "DR TO", "CR TO", "Diff", "Diff"};
+        for (int i = 0; i < RECONCILIATION_TABLE_LENGTH; i++) {
 
-        for (int i = 0; i < 12; i++) {
-            String columnHeader = columnNames[i];
+            String currentColumnHeader = RECONCILIATION_TABLE_COLUMN_NAMES[i];
             Cell currentCell = thirdRow.createCell(i);
-            currentCell.setCellValue(columnHeader);
+            currentCell.setCellValue(currentColumnHeader);
             if (i > 9) {
-                currentCell.setCellStyle(columnHeaderStyleDiff);
+                currentCell.setCellStyle(StyleHelper.createColumnDifferenceHeaderStyle(forexFile));
             } else {
-                currentCell.setCellStyle(columnHeaderStyle);
+                currentCell.setCellStyle(StyleHelper.createColumnHeaderStyle(forexFile));
             }
         }
 
-        try (OutputStream outputStream = new FileOutputStream(PATH_OUT)){
-            forexFile.write(outputStream);
-        } catch (Exception e) {
-            throw new FileNotFoundException();
-        }
-
-
-
     }
 
-    public void fillReconciliationTable(List<AccountReconciliation> accountsReconciliation) throws IOException {
+    public int fillReconciliationTable(List<AccountReconciliation> accountsReconciliation) throws IOException {
         long size = accountsReconciliation.stream().count();
-        int currentRowIndex = 3;
+        int currentRowIndex = RECONCILIATION_DATA_FIRST_ROW;
         for (AccountReconciliation iterator: accountsReconciliation) {
              Row currentRow = forexSheet.createRow(currentRowIndex);
 
@@ -168,9 +119,9 @@ public class ExcelCreator {
         }
 
         Row reconciliationTableClosingRow = forexSheet.createRow(currentRowIndex);
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < RECONCILIATION_TABLE_LENGTH; i++) {
             Cell currentCell = reconciliationTableClosingRow.createCell(i);
-            currentCell.setCellStyle(createClosingRowStyle());
+            currentCell.setCellStyle(StyleHelper.createClosingRowStyle(forexFile));
         }
 
         try (OutputStream outputStream = new FileOutputStream(PATH_OUT)){
@@ -178,13 +129,11 @@ public class ExcelCreator {
         } catch (Exception e) {
             throw new IOException();
         }
+
+        return currentRowIndex;
     }
 
-    private CellStyle createClosingRowStyle() {
-        CellStyle closingStyle = forexFile.createCellStyle();
-        closingStyle.setBorderTop(BorderStyle.THIN);
-        return closingStyle;
-    }
+
 
     private void formatReconciliationTable(Row currentRow) {
         Iterator<Cell> cellIterator = currentRow.cellIterator();
@@ -192,56 +141,304 @@ public class ExcelCreator {
         while (cellIterator.hasNext()){
             Cell currentCell = cellIterator.next();
             if (currentCell.getColumnIndex() < 4) {
-                currentCell.setCellStyle(createMainStyle());
+                currentCell.setCellStyle(StyleHelper.createMainDataStyle(forexFile));
             } else if (currentCell.getColumnIndex() < 10) {
-                currentCell.setCellStyle(createAccountingStyle());
+                currentCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
             } else {
-                currentCell.setCellStyle(createDiffStyle());
+                currentCell.setCellStyle(StyleHelper.createDifferencesStyle(forexFile));
             }
-
-
         }
     }
 
+    public int createDelimiterRows(int currentRowIndex){
 
-    private CellStyle createDiffStyle() {
-        CellStyle diffStyle = forexFile.createCellStyle();
-        Font diffFont = forexFile.createFont();
-        DataFormat diffFormat = forexFile.createDataFormat();
+        Row delimiterRow = forexSheet.createRow(currentRowIndex + 2);
 
-        diffFont.setFontName("Arial");
-        diffFont.setFontHeightInPoints((short) 8);
-        diffFont.setColor(IndexedColors.RED.getIndex());
-        diffStyle.setDataFormat(diffFormat.getFormat("#,##0_);(#,##0)"));
-        diffStyle.setFont(diffFont);
-        diffStyle.setFillPattern(FillPatternType.NO_FILL);
+        for (int i = 0; i < 100; i++) {
+            Cell currentCell = delimiterRow.createCell(i);
+            currentCell.setCellStyle(StyleHelper.createDelimiterRowStyle(forexFile));
+            if (i == 0) currentCell.setCellValue("Forex recalculation for Cash accounts");
+        }
 
-        return diffStyle;
-        
+        currentRowIndex += 3;
+        return currentRowIndex;
     }
 
-    private CellStyle createAccountingStyle() {
-        CellStyle accountingStyle = forexFile.createCellStyle();
-        Font accountingFont = forexFile.createFont();
-        DataFormat accountingFormat = forexFile.createDataFormat();
+    public int createTotalProfitAndLossRow(int currentRowIndex, List<TotalProfitLossForCurrency> profitAndLostTotals){
 
-        accountingFont.setFontName("Arial");
-        accountingFont.setFontHeightInPoints((short) 8);
-        accountingStyle.setDataFormat(accountingFormat.getFormat("#,##0_);(#,##0)"));
-        accountingStyle.setFont(accountingFont);
-        
-        return accountingStyle;
+        Row totalForesProfitAndLossRow = forexSheet.createRow(currentRowIndex);
+        Cell firstNamingCell = totalForesProfitAndLossRow.createCell(1);
+        Cell secondNamingCell = totalForesProfitAndLossRow.createCell(2);
+        Cell amountCell = totalForesProfitAndLossRow.createCell(3);
+
+        firstNamingCell.setCellValue("Total Forex P/L");
+        firstNamingCell.setCellStyle(StyleHelper.createLeftBorderedCellStyle(forexFile));
+        secondNamingCell.setCellStyle(StyleHelper.createLeftBorderedCellStyle(forexFile));
+        forexSheet.addMergedRegion(new CellRangeAddress(currentRowIndex, currentRowIndex, 1, 2));
+
+        amountCell.setCellValue(TotalProfitLoss.calculateTotalProfitAndLost(profitAndLostTotals).doubleValue());
+        amountCell.setCellStyle(StyleHelper.createRightBorderedCellStyle(forexFile));
+
+        currentRowIndex += 2;
+        return currentRowIndex;
     }
 
-    private CellStyle createMainStyle() {
-        CellStyle mainStyle = forexFile.createCellStyle();
-        Font mainFont = forexFile.createFont();
+    public void createForexTables(int currentRowIndex, List<TotalProfitLossForCurrency> profitLossTotals, List<ForexDailyRecalculation> forexDailyRecalculations, List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance){
 
-        mainFont.setFontName("Arial");
-        mainFont.setFontHeightInPoints((short) 8);
-        mainStyle.setFont(mainFont);
-        return mainStyle;
+        List<String> uniqueCurrencies = forexDailyRecalculations.stream()
+                .map(ForexDailyRecalculation::getCurrency)
+                .distinct()
+                .collect(Collectors.toList());
+
+        currentRowIndex = createTablesNumbersAndNames(currentRowIndex, uniqueCurrencies);
+        currentRowIndex = createTotalProfitLossForEachCurrency(currentRowIndex, uniqueCurrencies, profitLossTotals);
+        currentRowIndex = createReconciliationsForForexRecalculations(currentRowIndex, uniqueCurrencies, dailyRecalculationReconciliationsToTrialBalance);
+        currentRowIndex = createForexDailyRecalculations(currentRowIndex, uniqueCurrencies, forexDailyRecalculations);
+
     }
+
+    private int createForexDailyRecalculations(int currentRowIndex, List<String> uniqueCurrencies, List<ForexDailyRecalculation> forexDailyRecalculations) {
+        currentRowIndex = createForexDailyCalculationsHeaderRow(currentRowIndex, uniqueCurrencies);
+        currentRowIndex = fillForexDailyCalculationTables(currentRowIndex, uniqueCurrencies, forexDailyRecalculations);
+        return  currentRowIndex;
+    }
+
+    private int fillForexDailyCalculationTables(int currentRowIndex, List<String> uniqueCurrencies, List<ForexDailyRecalculation> forexDailyRecalculations) {
+
+        List<Date> datesInYear = extractDates(forexDailyRecalculations);
+        for (Date currentDate: datesInYear) {
+            currentRowIndex = fillCalculationRowForCurrentDate(currentDate, currentRowIndex, uniqueCurrencies, forexDailyRecalculations);
+        }
+            currentRowIndex = createClosingLineForCalculationTables(currentRowIndex, uniqueCurrencies);
+        return ++currentRowIndex;
+    }
+
+    private int createClosingLineForCalculationTables(int currentRowIndex, List<String> uniqueCurrencies) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX;
+        Row closingLineRow = forexSheet.createRow(currentRowIndex);
+        for (String currentCurrency: uniqueCurrencies) {
+            for (int i = 0; i < FOREX_DAILY_TABLE_LENGTH; i++) {
+                Cell currentCell = closingLineRow.createCell(beginningColumn + i);
+                currentCell.setCellStyle(StyleHelper.createClosingRowStyle(forexFile));
+            }
+            beginningColumn += 9;
+        }
+        return ++currentRowIndex;
+    }
+
+    private int fillCalculationRowForCurrentDate(Date currentDate, int currentRowIndex, List<String> uniqueCurrencies, List<ForexDailyRecalculation> forexDailyRecalculations) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX;
+        Row currentDateRow = forexSheet.createRow(currentRowIndex);
+        for (String currentCurrency: uniqueCurrencies) {
+            ForexDailyRecalculation currentDateAndCurrencyCalculation = findDailyCalculationByDateCurrency(currentDate, currentCurrency, forexDailyRecalculations);
+
+            Cell dateCell = currentDateRow.createCell(beginningColumn);
+            dateCell.setCellValue(currentDateAndCurrencyCalculation.getDate());
+            dateCell.setCellStyle(StyleHelper.createDateCellStyle(forexFile));
+            Cell currencyRateCell = currentDateRow.createCell(beginningColumn + 1);
+            currencyRateCell.setCellValue(currentDateAndCurrencyCalculation.getCurrencyRate().doubleValue());
+            currencyRateCell.setCellStyle(StyleHelper.createCurrencyRateStyle(forexFile));
+            Cell openingBalanceCell = currentDateRow.createCell(beginningColumn + 2);
+            openingBalanceCell.setCellValue(currentDateAndCurrencyCalculation.getOpeningBalance().doubleValue());
+            openingBalanceCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            Cell debitTurnoverCell = currentDateRow.createCell(beginningColumn + 3);
+            debitTurnoverCell.setCellValue(currentDateAndCurrencyCalculation.getDailyDebitTurnover().doubleValue());
+            debitTurnoverCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            Cell creditTurnoverCell = currentDateRow.createCell(beginningColumn + 4);
+            creditTurnoverCell.setCellValue(currentDateAndCurrencyCalculation.getDailyCreditTurnover().doubleValue());
+            creditTurnoverCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            Cell closingBalanceCell = currentDateRow.createCell(beginningColumn + 5);
+            closingBalanceCell.setCellValue(currentDateAndCurrencyCalculation.getClosingBalance().doubleValue());
+            closingBalanceCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            Cell profitLossCell = currentDateRow.createCell(beginningColumn+6);
+            profitLossCell.setCellValue(currentDateAndCurrencyCalculation.getProfitLossInUah().doubleValue());
+            profitLossCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+
+            beginningColumn += 9;
+        }
+        return ++currentRowIndex;
+    }
+
+    private ForexDailyRecalculation findDailyCalculationByDateCurrency(Date currentDate, String currentCurrency, List<ForexDailyRecalculation> forexDailyRecalculations) {
+        return forexDailyRecalculations.stream()
+                .filter(dailyRecalculation -> dailyRecalculation.getDate().equals(currentDate))
+                .filter(dailyRecalculation -> dailyRecalculation.getCurrency().equals(currentCurrency))
+                .findFirst()
+                .get();
+    }
+
+    private List<Date> extractDates(List<ForexDailyRecalculation> forexDailyRecalculations) {
+        return forexDailyRecalculations.stream()
+                .map(ForexDailyRecalculation::getDate)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    private int createForexDailyCalculationsHeaderRow(int currentRowIndex, List<String> uniqueCurrencies) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX;
+        Row forexDailyRecalculationsHeaderRow = forexSheet.createRow(currentRowIndex);
+        for (String currentCurrency: uniqueCurrencies) {
+            for (int i = 0; i < FOREX_DAILY_TABLE_LENGTH; i++) {
+                Cell currentCell = forexDailyRecalculationsHeaderRow.createCell(i + beginningColumn);
+                currentCell.setCellValue(FOREX_DAILY_TABLE_COLUMN_NAMES[i]);
+                currentCell.setCellStyle(StyleHelper.createColumnHeaderStyle(forexFile));
+            }
+            beginningColumn += 9;
+        }
+        return ++currentRowIndex;
+    }
+
+    private int createReconciliationsForForexRecalculations(int currentRowIndex, List<String> uniqueCurrencies, List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance) {
+
+        currentRowIndex = createReconciliationHeaderRow(currentRowIndex, uniqueCurrencies.size());
+        currentRowIndex = createReconciliationPerCalculationRow(currentRowIndex, uniqueCurrencies, PER_CALCULATION_LINE_TYPE, dailyRecalculationReconciliationsToTrialBalance);
+        currentRowIndex = createReconciliationPerCalculationRow(currentRowIndex, uniqueCurrencies, PER_TRIAL_BALANCE_LINE_TYPE,dailyRecalculationReconciliationsToTrialBalance);
+        currentRowIndex = createCheckForDifferencesRow(currentRowIndex, uniqueCurrencies, dailyRecalculationReconciliationsToTrialBalance);
+
+        return ++currentRowIndex;
+    }
+
+    private int createCheckForDifferencesRow(int currentRowIndex, List<String> uniqueCurrencies, List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX + 1;
+        Row reconciliationPerCalculationRow = forexSheet.createRow(currentRowIndex);
+        List<DailyRecalculationReconciliation> turnoverAmountsPerCalculation = extractTurnoverAmountsPerLineType(CHECK_LINE_TYPE, dailyRecalculationReconciliationsToTrialBalance);
+
+        for (String currentCurrency: uniqueCurrencies) {
+            DailyRecalculationReconciliation dailyRecalculationReconciliationForCurrentCurrency = dailyRecalculationReconciliationForCurrentCurrency(currentCurrency, turnoverAmountsPerCalculation);
+
+            Cell descriptionCell = reconciliationPerCalculationRow.createCell(beginningColumn);
+            descriptionCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getDescription());
+            descriptionCell.setCellStyle(StyleHelper.createCheckLineCellStyle(forexFile));
+            Cell openingBalanceCell = reconciliationPerCalculationRow.createCell(beginningColumn + 1);
+            openingBalanceCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getOpeningBalance().doubleValue());
+            openingBalanceCell.setCellStyle(StyleHelper.createCheckLineCellStyle(forexFile));
+            Cell debitTurnoverCell = reconciliationPerCalculationRow.createCell(beginningColumn + 2);
+            debitTurnoverCell.setCellStyle(StyleHelper.createCheckLineCellStyle(forexFile));
+            debitTurnoverCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getDebitTurnover().doubleValue());
+            Cell creditTurnoverCell = reconciliationPerCalculationRow.createCell(beginningColumn + 3);
+            creditTurnoverCell.setCellStyle(StyleHelper.createCheckLineCellStyle(forexFile));
+            creditTurnoverCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getCreditTurnover().doubleValue());
+            Cell closingBalanceCell = reconciliationPerCalculationRow.createCell(beginningColumn + 4);
+            closingBalanceCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getClosingBalance().doubleValue());
+            closingBalanceCell.setCellStyle(StyleHelper.createCheckLineCellStyle(forexFile));
+            beginningColumn += 9;
+        }
+        return ++currentRowIndex;
+    }
+
+    private int createReconciliationPerCalculationRow(int currentRowIndex, List<String> uniqueCurrencies, String lineType, List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX + 1;
+        Row reconciliationPerCalculationRow = forexSheet.createRow(currentRowIndex);
+        List<DailyRecalculationReconciliation> turnoverAmountsPerCalculation = extractTurnoverAmountsPerLineType(lineType, dailyRecalculationReconciliationsToTrialBalance);
+
+        for (String currentCurrency: uniqueCurrencies) {
+            DailyRecalculationReconciliation dailyRecalculationReconciliationForCurrentCurrency = dailyRecalculationReconciliationForCurrentCurrency(currentCurrency, turnoverAmountsPerCalculation);
+
+            Cell descriptionCell = reconciliationPerCalculationRow.createCell(beginningColumn);
+            descriptionCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getDescription());
+            descriptionCell.setCellStyle(StyleHelper.createMainDataStyle(forexFile));
+            Cell openingBalanceCell = reconciliationPerCalculationRow.createCell(beginningColumn + 1);
+            openingBalanceCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getOpeningBalance().doubleValue());
+            openingBalanceCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            Cell debitTurnoverCell = reconciliationPerCalculationRow.createCell(beginningColumn + 2);
+            debitTurnoverCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            debitTurnoverCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getDebitTurnover().doubleValue());
+            Cell creditTurnoverCell = reconciliationPerCalculationRow.createCell(beginningColumn + 3);
+            creditTurnoverCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            creditTurnoverCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getCreditTurnover().doubleValue());
+            Cell closingBalanceCell = reconciliationPerCalculationRow.createCell(beginningColumn + 4);
+            closingBalanceCell.setCellValue(dailyRecalculationReconciliationForCurrentCurrency.getClosingBalance().doubleValue());
+            closingBalanceCell.setCellStyle(StyleHelper.createAccountingStyle(forexFile));
+            beginningColumn = beginningColumn + 9;
+        }
+        return ++currentRowIndex;
+    }
+
+    private DailyRecalculationReconciliation dailyRecalculationReconciliationForCurrentCurrency(String currentCurrency, List<DailyRecalculationReconciliation> turnoverAmountsPerCalculation) {
+        return turnoverAmountsPerCalculation.stream()
+                .filter(perRecalculationTotals -> perRecalculationTotals.getCurrency().equals(currentCurrency))
+                .findFirst()
+                .get();
+    }
+
+    private List<DailyRecalculationReconciliation> extractTurnoverAmountsPerLineType(String reconciliationLineType , List<DailyRecalculationReconciliation> dailyRecalculationReconciliationsToTrialBalance) {
+        return dailyRecalculationReconciliationsToTrialBalance.stream()
+                .filter(reconciliation -> reconciliation.getDescription().equals(reconciliationLineType))
+                .collect(Collectors.toList());
+    }
+
+
+    private int createReconciliationHeaderRow(int currentRowIndex, int size) {
+        int beginningColumn = BEGINNING_COLUMN_INDEX + 1;
+        Row reconciliationHeaderRow = forexSheet.createRow(currentRowIndex);
+
+        for (int i = 0; i < size; i++) {
+            createHeaderCells(reconciliationHeaderRow, beginningColumn);
+            beginningColumn += 9;
+        }
+
+        return ++currentRowIndex;
+    }
+
+    private void createHeaderCells(Row reconciliationHeaderRow, int beginningColumn) {
+        for (int i = 0; i < CALCULATION_RECONCILIATION_LENGTH; i++) {
+            Cell currentHeaderCell = reconciliationHeaderRow.createCell(beginningColumn);
+            currentHeaderCell.setCellValue(CALCULATION_RECONCILIATION_COLUMN_NAMES[i]);
+            currentHeaderCell.setCellStyle(StyleHelper.createColumnHeaderStyle(forexFile));
+            beginningColumn++;
+        }
+    }
+
+    private int createTotalProfitLossForEachCurrency(int currentRowIndex, List<String> uniqueCurrencies, List<TotalProfitLossForCurrency> profitLossTotals) {
+        Row totalProfitLossForEachCurrencyRow = forexSheet.createRow(currentRowIndex);
+        int beginningColumn = BEGINNING_COLUMN_INDEX + 1;
+
+        for (String currentCurrency : uniqueCurrencies) {
+            Cell titleCell = totalProfitLossForEachCurrencyRow.createCell(beginningColumn);
+            titleCell.setCellValue("Forex P/L");
+            titleCell.setCellStyle(StyleHelper.createLeftBorderedCellStyle(forexFile));
+
+            Cell amountCell = totalProfitLossForEachCurrencyRow.createCell(beginningColumn+1);
+            amountCell.setCellValue(extractProfitLossByCurrency(currentCurrency, profitLossTotals));
+            amountCell.setCellStyle(StyleHelper.createRightBorderedCellStyle(forexFile));
+            beginningColumn += 9;
+
+        }
+        currentRowIndex += 2;
+        return currentRowIndex;
+    }
+
+    private double extractProfitLossByCurrency(String currentCurrency, List<TotalProfitLossForCurrency> profitLossTotals) {
+        return profitLossTotals.stream()
+                .filter(profitLossTotal -> profitLossTotal.getCurrency().equals(currentCurrency))
+                .findAny()
+                .get()
+                .getTotalProfitLoss().doubleValue();
+    }
+
+
+
+    private int createTablesNumbersAndNames(int currentRowIndex, List<String> uniqueCurrencies) {
+        Row tablesNumbersAndNamesRow = forexSheet.createRow(currentRowIndex);
+
+        int beginningColumn = BEGINNING_COLUMN_INDEX;
+        int tableIndex = 1;
+        for (String currentCurrency: uniqueCurrencies) {
+            Cell tableNumberCell = tablesNumbersAndNamesRow.createCell(beginningColumn);
+            tableNumberCell.setCellValue("Table 2." + tableIndex);
+            tableNumberCell.setCellStyle(StyleHelper.createTableNumberStyle(forexFile));
+
+            Cell tableNameCell = tablesNumbersAndNamesRow.createCell(beginningColumn+1);
+            tableNameCell.setCellValue(currentCurrency);
+            tableNameCell.setCellStyle(StyleHelper.createTableNameStyle(forexFile));
+
+            beginningColumn += 9;
+        }
+        currentRowIndex += 2;
+        return currentRowIndex;
+    }
+
 
     public ExcelCreator(String PATH_OUT) {
         this.PATH_OUT = PATH_OUT;

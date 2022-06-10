@@ -31,6 +31,105 @@ public class AccountReconciliation {
         this.creditTurnoverDifference = creditTurnoverDifference;
     }
 
+    public AccountReconciliation(AccountReconciliationBuilder accountReconciliationBuilder){
+        this.accountId = accountReconciliationBuilder.accountId;
+        this.accountDescription = accountReconciliationBuilder.accountDescription;
+        this.accountCurrency = accountReconciliationBuilder.accountCurrency;
+        this.currencyCode = accountReconciliationBuilder.currencyCode;
+        this.openingBalancePerTb = accountReconciliationBuilder.openingBalancePerTb;
+        this.debitTurnoverPerTb = accountReconciliationBuilder.debitTurnoverPerTb;
+        this.creditTurnoverPerTb = accountReconciliationBuilder.creditTurnoverPerTb;
+        this.closingBalancePerTb = accountReconciliationBuilder.closingBalancePerTb;
+        this.debitTurnoverPerJe = accountReconciliationBuilder.debitTurnoverPerJe;
+        this.creditTurnoverPerJe = accountReconciliationBuilder.creditTurnoverPerJe;
+        this.debitTurnoverDifference = accountReconciliationBuilder.debitTurnoverDifference;
+        this.creditTurnoverDifference = accountReconciliationBuilder.creditTurnoverDifference;
+    }
+
+    public static class AccountReconciliationBuilder{
+        private String accountId;
+        private String accountDescription;
+        private String accountCurrency;
+        private String currencyCode;
+        private BigDecimal openingBalancePerTb;
+        private BigDecimal debitTurnoverPerTb;
+        private BigDecimal creditTurnoverPerTb;
+        private BigDecimal closingBalancePerTb;
+        private BigDecimal debitTurnoverPerJe;
+        private BigDecimal creditTurnoverPerJe;
+        private BigDecimal debitTurnoverDifference;
+        private BigDecimal creditTurnoverDifference;
+
+        public AccountReconciliationBuilder(){
+        }
+
+        public AccountReconciliationBuilder accountId(String accountId){
+            this.accountId = accountId;
+            return this;
+        }
+
+        public AccountReconciliationBuilder accountDescription(String accountDescription){
+            this.accountDescription = accountDescription;
+            return this;
+        }
+
+        public AccountReconciliationBuilder accountCurrency(String accountCurrency){
+            this.accountCurrency = accountCurrency;
+            return this;
+        }
+
+        public AccountReconciliationBuilder currencyCode(String currencyCode){
+            this.currencyCode = currencyCode;
+            return this;
+        }
+
+        public AccountReconciliationBuilder openingBalancePerTb(BigDecimal openingBalancePerTb){
+            this.openingBalancePerTb = openingBalancePerTb;
+            return this;
+        }
+
+        public AccountReconciliationBuilder debitTurnoverPerTb(BigDecimal debitTurnoverPerTb){
+            this.debitTurnoverPerTb = debitTurnoverPerTb;
+            return this;
+        }
+
+        public AccountReconciliationBuilder creditTurnoverPerTb(BigDecimal creditTurnoverPerTb){
+            this.creditTurnoverPerTb = creditTurnoverPerTb;
+            return this;
+        }
+
+        public AccountReconciliationBuilder closingBalancePerTb(BigDecimal closingBalancePerTb){
+            this.closingBalancePerTb = closingBalancePerTb;
+            return this;
+        }
+
+        public AccountReconciliationBuilder debitTurnoverPerJe(BigDecimal debitTurnoverPerJe){
+            this.debitTurnoverPerJe = debitTurnoverPerJe;
+            return this;
+        }
+
+        public AccountReconciliationBuilder creditTurnoverPerJe(BigDecimal creditTurnoverPerJe){
+            this.creditTurnoverPerJe = creditTurnoverPerJe;
+            return this;
+        }
+
+        public AccountReconciliationBuilder debitTurnoverDifference(BigDecimal debitTurnoverDifference){
+            this.debitTurnoverDifference = debitTurnoverDifference;
+            return this;
+        }
+
+        public AccountReconciliationBuilder creditTurnoverDifference(BigDecimal creditTurnoverDifference){
+            this.creditTurnoverDifference = creditTurnoverDifference;
+            return this;
+        }
+
+        public AccountReconciliation build(){
+            AccountReconciliation accountReconciliation = new AccountReconciliation(this);
+            return accountReconciliation;
+        }
+
+    }
+
     @Override
     public String toString() {
         return "AccountReconciliation{" +

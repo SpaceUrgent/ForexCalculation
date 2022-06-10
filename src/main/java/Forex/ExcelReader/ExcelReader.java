@@ -47,12 +47,12 @@ public class ExcelReader {
 
         }
 
-        System.out.println("RESULT");
-        System.out.println("_______________________________________");
-
-        for (JERecord it: journalEntries) {
-            System.out.println(it);
-        }
+//        System.out.println("RESULT");
+//        System.out.println("_______________________________________");
+//
+//        for (JERecord it: journalEntries) {
+//            System.out.println(it);
+//        }
         return journalEntries;
     }
 
@@ -97,12 +97,12 @@ public class ExcelReader {
 
         }
 
-        System.out.println("RESULT");
-        System.out.println("_______________________________________");
-
-        for (TBAccount it: accountBalances) {
-            System.out.println(it);
-        }
+//        System.out.println("RESULT");
+//        System.out.println("_______________________________________");
+//
+//        for (TBAccount it: accountBalances) {
+//            System.out.println(it);
+//        }
         return accountBalances;
     }
 
@@ -126,12 +126,12 @@ public class ExcelReader {
 
         }
 
-        System.out.println("RESULT");
-        System.out.println("_______________________________________");
-
-        for (NBURate it: nbuRates) {
-            System.out.println(it);
-        }
+//        System.out.println("RESULT");
+//        System.out.println("_______________________________________");
+//
+//        for (NBURate it: nbuRates) {
+//            System.out.println(it);
+//        }
         return nbuRates;
     }
 

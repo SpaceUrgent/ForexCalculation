@@ -1,10 +1,14 @@
 package Forex.CalculationLogic;
 
+import Forex.Consants.EntryType;
 import Forex.DataContainers.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ForexRecalculation {
 
@@ -13,48 +17,88 @@ public class ForexRecalculation {
 
     List<JERecord> journalEntries;
 
-    public List<ForexDailyRecalculation> performForexDailyRecalculationsUsd(){
-        List<Date> datesInYear = extractDates();
-        List<ForexDailyRecalculation> emptyForexRecalculation = createEmptyDailyForex(datesInYear);
-        return performDailyRecalculationForCurrency("USD", emptyForexRecalculation);
+    int currentYear;
+
+
+    public ForexRecalculation(List<NBURate> nbuRates, List<TBAccount> accountsTb, List<JERecord> journalEntries, int currentYear) {
+        this.nbuRates = nbuRates;
+        this.accountsTb = accountsTb;
+        this.journalEntries = journalEntries;
+        this.currentYear = currentYear;
+    }
+
+    public List<ForexDailyRecalculation> performDailyRecalculationForAllCurrencies(){
+        List<String> uniqueCurrencies = extractCurrenciesFromTrialBalance();
+
+        List<ForexDailyRecalculation> dailyRecalculationsForAllCurrencies = new ArrayList<>();
+
+
+        for (String currency: uniqueCurrencies) {
+            List<ForexDailyRecalculation> dailyRecalculationsForCurrentCurrency = performDailyRecalculationForCurrency(currency);
+
+            dailyRecalculationsForAllCurrencies.addAll(dailyRecalculationsForCurrentCurrency);
+        }
+
+        return dailyRecalculationsForAllCurrencies;
     }
 
 
-    public List<ForexDailyRecalculation> performForexDailyRecalculationsEur(){
-        List<Date> datesInYear = extractDates();
-        List<ForexDailyRecalculation> emptyForexRecalculation = createEmptyDailyForex(datesInYear);
-        return performDailyRecalculationForCurrency("EUR", emptyForexRecalculation);
+    private List<String> extractCurrenciesFromTrialBalance() {
+        List<String> uniqueCurrencies = accountsTb.stream()
+                .map(TBAccount::getCurrency)
+                .distinct()
+                .collect(Collectors.toList());
+        return uniqueCurrencies;
     }
 
-    public List<ForexDailyRecalculation> performForexDailyRecalculationsGbp(){
-        List<Date> datesInYear = extractDates();
-        List<ForexDailyRecalculation> emptyForexRecalculation = createEmptyDailyForex(datesInYear);
-        return performDailyRecalculationForCurrency("GBP", emptyForexRecalculation);
+    public List<TotalProfitLossForCurrency> calculateTotalProfitLoss(List<ForexDailyRecalculation> forexDailyRecalculations){
+        List<String> uniqueCurrencies = extractCurrenciesFromTrialBalance();
+        List<TotalProfitLossForCurrency> profitLossTotals = new ArrayList<>();
+        for (String currency: uniqueCurrencies) {
+            TotalProfitLossForCurrency totalProfitLossForCurrentCurrency = calculateTotalProfitLossForCurrency(currency, forexDailyRecalculations);
+            profitLossTotals.add(totalProfitLossForCurrentCurrency);
+        }
+        return profitLossTotals;
     }
 
+    public TotalProfitLossForCurrency calculateTotalProfitLossForCurrency(String currency,List<ForexDailyRecalculation> forexDailyRecalculations){
 
-    public TotalProfitLoss calculateTotalProfitLoss(List<ForexDailyRecalculation> forexDailyRecalculations){
-        String currency = forexDailyRecalculations.stream().iterator().next().getCurrency();
         BigDecimal totalPl = forexDailyRecalculations.stream()
-                .map(f -> f.getProfitLossInUah())
-                .reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
-        return new TotalProfitLoss(currency, totalPl);
+                .filter(forexDailyRecalculation -> forexDailyRecalculation.getCurrency().equals(currency))
+                .map(ForexDailyRecalculation::getProfitLossInUah)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new TotalProfitLossForCurrency(currency, totalPl);
     }
 
-    public List<DailyRecalculationReconciliation> reconcileDailyCalculationToTb(List<ForexDailyRecalculation> forexDailyRecalculations){
-        List<DailyRecalculationReconciliation> reconciliationToTb = new ArrayList<>();
-        String currency = forexDailyRecalculations.stream().iterator().next().getCurrency();
-        DailyRecalculationReconciliation perCalculations = calculateBalancesPerDailyRecalculation(forexDailyRecalculations);
-        reconciliationToTb.add(perCalculations);
-        DailyRecalculationReconciliation perTB = extractBalancesFromTb(currency);
-        reconciliationToTb.add(perTB);
-        DailyRecalculationReconciliation checkLine = checkCalculationsToTb(perCalculations, perTB);
-        reconciliationToTb.add(checkLine);
-        return  reconciliationToTb;
+    public List<DailyRecalculationReconciliation> reconcileDailyCalculationToTrialBalance(List<ForexDailyRecalculation> forexDailyRecalculations){
+        List<DailyRecalculationReconciliation> dailyRecalculationReconciliations = new ArrayList<>();
+        List<String> uniqueCurrencies = extractCurrenciesFromTrialBalance();
 
+        for (String currentCurrency: uniqueCurrencies) {
+            DailyRecalculationReconciliation dailyRecalculationReconciliationPerCalculation = calculateBalancesPerDailyRecalculation(currentCurrency, forexDailyRecalculations);
+            dailyRecalculationReconciliations.add(dailyRecalculationReconciliationPerCalculation);
+            DailyRecalculationReconciliation dailyRecalculationReconciliationPerTrialBalance = extractBalancesFromTrialBalance(currentCurrency);
+            dailyRecalculationReconciliations.add(dailyRecalculationReconciliationPerTrialBalance);
+            DailyRecalculationReconciliation dailyRecalculationCheckToTrialBalance = checkCalculationsToTrialBalance(dailyRecalculationReconciliationPerCalculation, dailyRecalculationReconciliationPerTrialBalance);
+            dailyRecalculationReconciliations.add(dailyRecalculationCheckToTrialBalance);
+        }
+        return dailyRecalculationReconciliations;
     }
 
-    private DailyRecalculationReconciliation checkCalculationsToTb(DailyRecalculationReconciliation perCalculations, DailyRecalculationReconciliation perTB) {
+//    public List<DailyRecalculationReconciliation> reconcileDailyCalculationToTrialBalance(List<ForexDailyRecalculation> forexDailyRecalculations){
+//        List<DailyRecalculationReconciliation> reconciliationToTb = new ArrayList<>();
+//        String currency = forexDailyRecalculations.get(0).getCurrency();
+//        DailyRecalculationReconciliation perCalculations = calculateBalancesPerDailyRecalculation(forexDailyRecalculations);
+//        reconciliationToTb.add(perCalculations);
+//        DailyRecalculationReconciliation perTB = extractBalancesFromTrialBalance(currency);
+//        reconciliationToTb.add(perTB);
+//        DailyRecalculationReconciliation checkPerCalculationFieldToPerTrialBalance = checkCalculationsToTb(perCalculations, perTB);
+//        reconciliationToTb.add(checkPerCalculationFieldToPerTrialBalance);
+//        return  reconciliationToTb;
+//
+//    }
+
+    private DailyRecalculationReconciliation checkCalculationsToTrialBalance(DailyRecalculationReconciliation perCalculations, DailyRecalculationReconciliation perTB) {
         String currency = perCalculations.getCurrency();
         String description = "Check";
         BigDecimal openingBalance = perCalculations.getOpeningBalance().subtract(perTB.getOpeningBalance());
@@ -64,60 +108,58 @@ public class ForexRecalculation {
         return  new DailyRecalculationReconciliation(currency, description, openingBalance, debitTurnover, creditTurnover, closingBalance);
     }
 
-    private DailyRecalculationReconciliation calculateBalancesPerDailyRecalculation(List<ForexDailyRecalculation> forexDailyRecalculations) {
-        String currency = forexDailyRecalculations.stream().iterator().next().getCurrency();
+    private DailyRecalculationReconciliation calculateBalancesPerDailyRecalculation(String currency ,List<ForexDailyRecalculation> forexDailyRecalculations) {
+        List<ForexDailyRecalculation> forexDailyRecalculationsPerCurrentCurrency = forexDailyRecalculations.stream()
+                .filter(dailyRecalculation -> dailyRecalculation.getCurrency().equals(currency))
+                .collect(Collectors.toList());
         String description = "Per Calc";
-        BigDecimal openingBalance = forexDailyRecalculations.stream().min(Comparator.comparing(d -> d.getDate())).get().getOpeningBalance();
-        BigDecimal debitTurnover = forexDailyRecalculations.stream().map(ob -> ob.getDailyDebitTurnover()).reduce(BigDecimal.ZERO, (a,b) -> a.add(b));
-        BigDecimal creditTurnover = forexDailyRecalculations.stream().map(ob -> ob.getDailyCreditTurnover()).reduce(BigDecimal.ZERO, (a,b) -> a.add(b));
-        BigDecimal closingBalance = forexDailyRecalculations.stream().max(Comparator.comparing(d -> d.getDate())).get().getClosingBalance();
+        BigDecimal openingBalance = forexDailyRecalculationsPerCurrentCurrency.stream().min(Comparator.comparing(ForexDailyRecalculation::getDate)).get().getOpeningBalance();
+        BigDecimal debitTurnover = forexDailyRecalculationsPerCurrentCurrency.stream().map(ForexDailyRecalculation::getDailyDebitTurnover).reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
+        BigDecimal creditTurnover = forexDailyRecalculationsPerCurrentCurrency.stream().map(ForexDailyRecalculation::getDailyCreditTurnover).reduce(BigDecimal.ZERO, (a, b) -> a.add(b));
+        BigDecimal closingBalance = forexDailyRecalculationsPerCurrentCurrency.stream().max(Comparator.comparing(ForexDailyRecalculation::getDate)).get().getClosingBalance();
         return  new DailyRecalculationReconciliation(currency, description, openingBalance, debitTurnover, creditTurnover, closingBalance);
     }
 
-    private DailyRecalculationReconciliation extractBalancesFromTb(String currency) {
+    private DailyRecalculationReconciliation extractBalancesFromTrialBalance(String currency) {
         String description = "Per TB";
-        BigDecimal openingBalance = accountsTb.stream().filter(x -> x.getCurrency().equals(currency)).findFirst().get().getOpeningBalance();
-        BigDecimal debitTurnover = accountsTb.stream().filter(x -> x.getCurrency().equals(currency)).findFirst().get().getDebitTurnover();
-        BigDecimal creditTurnover = accountsTb.stream().filter(x -> x.getCurrency().equals(currency)).findFirst().get().getCreditTurnover();
-        BigDecimal closingBalance = accountsTb.stream().filter(x -> x.getCurrency().equals(currency)).findFirst().get().getClosingBalance();
+        TBAccount trialBalanceAccount = accountsTb.stream().filter(tbAccount -> tbAccount.getCurrency().equals(currency)).findFirst().get();
+        BigDecimal openingBalance = trialBalanceAccount.getOpeningBalance();
+        BigDecimal debitTurnover = trialBalanceAccount.getDebitTurnover();
+        BigDecimal creditTurnover = trialBalanceAccount.getCreditTurnover();
+        BigDecimal closingBalance = trialBalanceAccount.getClosingBalance();
         return new DailyRecalculationReconciliation(currency, description, openingBalance, debitTurnover, creditTurnover, closingBalance);
     }
 
-    public List<Date> extractDates(){
-        return nbuRates.stream()
-                .map(d -> d.getDate())
-                .distinct()
-                .collect(Collectors.toList());
-    }
+    public List<ForexDailyRecalculation> performDailyRecalculationForCurrency(String currency){
 
-    public List<ForexDailyRecalculation> createEmptyDailyForex(List<Date> dates){
-        List<ForexDailyRecalculation> result = new ArrayList<>();
-        for (Date it: dates) {
-            result.add(new ForexDailyRecalculation(it));
-        }
-        return result;
-    }
-
-    public List<ForexDailyRecalculation> performDailyRecalculationForCurrency(String currency, List<ForexDailyRecalculation> emptyList){
-        Iterator<ForexDailyRecalculation> iterator = emptyList.iterator();
-        ForexDailyRecalculation previousLine = new ForexDailyRecalculation();
+        ForexDailyRecalculation previousDayForexRecalculation = new ForexDailyRecalculation();
         List<ForexDailyRecalculation> dailyRecalculations = new ArrayList<>();
 
-        while (iterator.hasNext()) {
-            ForexDailyRecalculation line = iterator.next();
-            line.setCurrency(currency);
-            line.setCurrencyRate(extractCurrencyRateByDate(currency, line.getDate()));
-            line.setOpeningBalance(calculateOpeningBalance(currency, previousLine));
-            line.setDailyDebitTurnover(calculateDebitTurnover(currency, line.getDate()));
-            line.setDailyCreditTurnover(calculateCreditTurnover(currency, line.getDate()));
-            line.setClosingBalance(calculateClosingBalance(line));
-            line.setProfitLossInUah(calculateProfitLoss(line, previousLine));
+        LocalDate currentDate = LocalDate.of(currentYear, 1, 1);
+        do {
+            ForexDailyRecalculation currentDayForexRecalculation = new ForexDailyRecalculation();
 
-            dailyRecalculations.add(line);
-            previousLine = line;
-        }
+            currentDayForexRecalculation.setCurrency(currency);
+            currentDayForexRecalculation.setDate(convertToDate(currentDate));
+            currentDayForexRecalculation.setCurrencyRate(extractCurrencyRateByDate(currency, convertToDate(currentDate)));
+            currentDayForexRecalculation.setOpeningBalance(calculateOpeningBalance(currency, previousDayForexRecalculation));
+            currentDayForexRecalculation.setDailyDebitTurnover(calculateTurnoverByType(currency, convertToDate(currentDate), EntryType.DR));
+            currentDayForexRecalculation.setDailyCreditTurnover(calculateTurnoverByType(currency, convertToDate(currentDate), EntryType.CR));
+            currentDayForexRecalculation.setClosingBalance(calculateClosingBalance(currentDayForexRecalculation));
+            currentDayForexRecalculation.setProfitLossInUah(calculateProfitLoss(currentDayForexRecalculation, previousDayForexRecalculation));
+
+            dailyRecalculations.add(currentDayForexRecalculation);
+            previousDayForexRecalculation = currentDayForexRecalculation;
+            currentDate = currentDate.plusDays(1);
+
+        } while(currentDate.getYear() == currentYear);
         return dailyRecalculations;
     }
+
+    private Date convertToDate(LocalDate currentDate) {
+        return Date.from(currentDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+    }
+
 
     public BigDecimal calculateProfitLoss(ForexDailyRecalculation line, ForexDailyRecalculation previousLine) {
         if (previousLine.getCurrencyRate() == null)
@@ -129,9 +171,6 @@ public class ForexRecalculation {
 
     public BigDecimal calculateClosingBalance(ForexDailyRecalculation line) {
 
-//        result.add(line.getOpeningBalance());
-//        result.add(line.getDailyDebitTurnover());
-//        result.add(line.getDailyCreditTurnover());
         BigDecimal ob = line.getOpeningBalance();
         BigDecimal dr = line.getDailyDebitTurnover();
         BigDecimal cr = line.getDailyCreditTurnover();
@@ -140,23 +179,15 @@ public class ForexRecalculation {
     }
 
 
-    public BigDecimal calculateDebitTurnover(String currency, Date date) {
+    public BigDecimal calculateTurnoverByType(String currency, Date date, EntryType entryType) {
         return BigDecimal.valueOf(journalEntries.stream()
                 .filter(c -> c.getCurrency().equals(currency))
                 .filter(d -> d.getRecordDate().equals(date))
-                .filter(type -> type.getEntryType().equals("DR"))
+                .filter(type -> type.getEntryType().equals(entryType.toString()))
                 .mapToDouble(je -> je.getAmount().doubleValue())
                 .sum());
     }
 
-    public BigDecimal calculateCreditTurnover(String currency, Date date) {
-        return BigDecimal.valueOf(journalEntries.stream()
-                .filter(c -> c.getCurrency().equals(currency))
-                .filter(d -> d.getRecordDate().equals(date))
-                .filter(type -> type.getEntryType().equals("CR"))
-                .mapToDouble(je -> je.getAmount().doubleValue())
-                .sum());
-    }
 
     public BigDecimal extractCurrencyRateByDate(String currency, Date date) {
         return nbuRates.stream()
@@ -166,23 +197,25 @@ public class ForexRecalculation {
                 .get().getCurrencyRate();
     }
 
-    public BigDecimal calculateOpeningBalance(String currency, ForexDailyRecalculation previousLine){
-        if (previousLine.getClosingBalance() == null)
-            return extractOpeningBalanceFromTb(currency);
-        return previousLine.getClosingBalance();
+    public BigDecimal calculateOpeningBalance(String currency, ForexDailyRecalculation previousLine) throws NoSuchElementException {
+        BigDecimal closingBalance;
+        if (previousLine.getClosingBalance() == null) {closingBalance = extractOpeningBalanceFromTrialBalance(currency);
+        } else { closingBalance = previousLine.getClosingBalance();}
+        return closingBalance;
     }
 
-    private BigDecimal extractOpeningBalanceFromTb(String currency) {
-        return accountsTb.stream()
+    public BigDecimal extractOpeningBalanceFromTrialBalance(String currency) throws NoSuchElementException {
+        TBAccount trialBalanceAccount = accountsTb.stream()
                 .filter(c -> c.getCurrency().equals(currency))
                 .findAny()
-                .get().getOpeningBalance();
+                .get();
+        checkIfNullObjectReturned(trialBalanceAccount);
+        return trialBalanceAccount.getOpeningBalance();
     }
 
-
-    public ForexRecalculation(List<NBURate> nbuRates, List<TBAccount> accountsTb, List<JERecord> journalEntries) {
-        this.nbuRates = nbuRates;
-        this.accountsTb = accountsTb;
-        this.journalEntries = journalEntries;
+    private void checkIfNullObjectReturned(TBAccount trialBalanceAccount) throws NoSuchElementException {
+        if (trialBalanceAccount == null){
+            throw new NoSuchElementException();
+        }
     }
 }
